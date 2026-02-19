@@ -11,21 +11,19 @@ import org.openqa.selenium.chrome.ChromeOptions;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class CustomerSearchUITest {
+
+    @LocalServerPort
+    int port; // Injects the random port
 
     private static WebDriver driver;
 
     @BeforeAll
     public static void setupClass() {
-        // ⚠️ Assumes chromedriver is installed and in PATH
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
-        options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--window-size=1920,1080");
-        options.setBinary("/usr/bin/google-chrome"); // path to Chrome binary on CI/local
-
         driver = new ChromeDriver(options);
     }
 
@@ -36,7 +34,7 @@ public class CustomerSearchUITest {
 
     @Test
     public void shouldDisplayCustomerSearchResults() throws InterruptedException {
-        driver.get("http://localhost:8080");
+        driver.get("http://localhost:" + port); // Use injected port
         WebElement searchBox = driver.findElement(By.id("keyword"));
         WebElement searchButton = driver.findElement(By.tagName("button"));
         searchBox.sendKeys("John");
@@ -49,3 +47,4 @@ public class CustomerSearchUITest {
         assertTrue(resultsText.contains("John"));
     }
 }
+
