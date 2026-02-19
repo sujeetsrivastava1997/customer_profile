@@ -33,15 +33,15 @@ jobs:
 
       - name: Build Project
         working-directory: customer-profile-search-app
-        run: mvn clean package --batch-mode
-
-      - name: List target folder (debug)
-        working-directory: customer-profile-search-app
-        run: ls -la target
+        run: mvn clean package --batch-mode -DskipTests
 
       - name: Run Unit Tests
         working-directory: customer-profile-search-app
         run: mvn test
+
+      - name: List target folder (debug)
+        working-directory: customer-profile-search-app
+        run: ls -la target
 
   # 2️⃣ API Tests
   api-tests:
@@ -60,7 +60,7 @@ jobs:
         working-directory: customer-profile-search-app
         run: mvn verify
 
-  # 3️⃣ Docker Build
+  # 3️⃣ Docker Build (Multi-stage)
   docker-build:
     name: Docker Build
     needs: api-tests
@@ -69,11 +69,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Build Docker Image
-        run: docker build -t customer-profile-search-app:latest ./customer-profile-search-app
+      - name: Build Docker Image (Multi-stage)
+        working-directory: customer-profile-search-app
+        run: docker build -t customer-profile-search-app:latest .
 
-
-  # 4️⃣ Deploy to Staging
+  # 4️⃣ Deploy Locally for Staging & Smoke Tests
   deploy-staging:
     name: Deploy to Staging
     needs: docker-build
@@ -92,7 +92,7 @@ jobs:
       - name: Verify API Health
         run: curl -f http://localhost:8080/api/customers || exit 1
 
-  # 5️⃣ Selenium UI Tests (Mandatory)
+  # 5️⃣ Selenium UI Tests
   ui-tests:
     name: Selenium UI Automation
     needs: deploy-staging
