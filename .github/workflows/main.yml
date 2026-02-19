@@ -1,5 +1,5 @@
----
 name: Customer Profile CI/CD Pipeline
+
 on:
   push:
     branches:
@@ -9,87 +9,136 @@ on:
     branches:
       - main
       - master
+
 jobs:
+
+  # ===============================
+  # 1️⃣ Build & Unit Test
+  # ===============================
   build:
-    name: Build & Unit Test
+    name: Build & Unit Tests
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+
       - name: Setup Java 21
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 21
+
       - name: Cache Maven Dependencies
         uses: actions/cache@v3
         with:
           path: ~/.m2
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+
       - name: Build Project
+        working-directory: customer-profile-search-app
         run: mvn clean package --batch-mode
+
       - name: Run Unit Tests
+        working-directory: customer-profile-search-app
         run: mvn test
+
+
+  # ===============================
+  # 2️⃣ API Integration Tests
+  # ===============================
   api-tests:
-    name: API Integration Tests
+    name: API Tests (Rest-Assured)
     needs: build
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 21
+
       - name: Run API Tests
+        working-directory: customer-profile-search-app
         run: mvn verify
+
+
+  # ===============================
+  # 3️⃣ Docker Build
+  # ===============================
   docker-build:
     name: Docker Build
     needs: api-tests
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - name: Build Docker Image
-        run: docker build -t customer-profile-search-app:latest .
+        run: docker build -t customer-profile-search-app:latest ./customer-profile-search-app
+
+
+  # ===============================
+  # 4️⃣ Deploy to Staging
+  # ===============================
   deploy-staging:
     name: Deploy to Staging
     needs: docker-build
     runs-on: ubuntu-latest
+
     steps:
       - name: Run Docker Container
-        run: >
+        run: |
           docker stop demo-app || true
-
           docker rm demo-app || true
-
           docker run -d -p 8080:8080 --name demo-app customer-profile-search-app:latest
+
       - name: Wait for App Startup
-        run: sleep 15
-      - name: Verify API
+        run: sleep 20
+
+      - name: Verify API Health
         run: curl -f http://localhost:8080/api/customers || exit 1
+
+
+  # ===============================
+  # 5️⃣ Selenium UI Tests (MANDATORY)
+  # ===============================
   ui-tests:
-    name: Selenium UI Tests
+    name: Selenium UI Automation
     needs: deploy-staging
     runs-on: ubuntu-latest
+
     services:
       selenium:
         image: selenium/standalone-chrome:latest
         ports:
           - 4444:4444
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 21
+
       - name: Run Selenium Tests
         env:
           BASE_URL: http://localhost:8080
           SELENIUM_URL: http://localhost:4444/wd/hub
+        working-directory: customer-profile-search-app
         run: mvn test -P ui
-  success:
-    name: Pipeline Completed
+
+
+  # ===============================
+  # 6️⃣ Success Confirmation
+  # ===============================
+  pipeline-success:
+    name: Pipeline Completed Successfully
     needs: ui-tests
     runs-on: ubuntu-latest
     steps:
-      - name: Success Message
-        run: echo "CI/CD Pipeline executed successfully"
+      - name: Done
+        run: echo "CI/CD Pipeline executed successfully 🚀"
