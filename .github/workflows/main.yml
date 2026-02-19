@@ -12,11 +12,10 @@ on:
 
 jobs:
 
-  # 1️ Build & Unit Tests
+  # 1️⃣ Build & Unit Tests
   build:
     name: Build & Unit Tests
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 
@@ -35,20 +34,15 @@ jobs:
         working-directory: customer-profile-search-app
         run: mvn clean package --batch-mode
 
-      - name: List target folder (debug)
-        working-directory: customer-profile-search-app
-        run: ls -la target
-
       - name: Run Unit Tests
         working-directory: customer-profile-search-app
         run: mvn test
 
-  # 2️ API Tests
-  api-tests:
-    name: API Tests
+  # 2️⃣ API Smoke Test
+  api-smoke:
+    name: API Smoke Tests
     needs: build
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v3
@@ -56,16 +50,47 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Run API Tests
+      - name: Run Smoke Tests
         working-directory: customer-profile-search-app
-        run: mvn verify
+        run: mvn test -Dtest=CustomerApiSmokeTest
 
-  # 3️ Docker Build
+  # 3️⃣ API Regression Test
+  api-regression:
+    name: API Regression Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Run Regression Tests
+        working-directory: customer-profile-search-app
+        run: mvn test -Dtest=CustomerApiRegressionTest
+
+  # 4️⃣ API Performance Test
+  api-performance:
+    name: API Performance Tests
+    needs: [api-smoke, api-regression]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Run Performance Tests
+        working-directory: customer-profile-search-app
+        run: mvn test -Dtest=CustomerPerformanceTest
+
+  # 5️⃣ Docker Build
   docker-build:
     name: Docker Build
-    needs: api-tests
+    needs: api-performance
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 
@@ -81,12 +106,11 @@ jobs:
           name: docker-image
           path: customer-profile-search-app.tar
 
-  # 4️ Deploy to Staging
+  # 6️⃣ Deploy to Staging
   deploy-staging:
     name: Deploy to Staging
     needs: docker-build
     runs-on: ubuntu-latest
-
     steps:
       - name: Download Docker Image Artifact
         uses: actions/download-artifact@v4
@@ -118,26 +142,22 @@ jobs:
           docker logs demo-app
           exit 1
 
-
-  # 5️ Selenium UI Tests (Mandatory)
+  # 7️⃣ Selenium UI Tests
   ui-tests:
     name: Selenium UI Automation
     needs: deploy-staging
     runs-on: ubuntu-latest
-
     services:
       selenium:
         image: selenium/standalone-chrome:latest
         ports:
           - 4444:4444
-
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 21
-
       - name: Run Selenium Tests
         env:
           BASE_URL: http://localhost:8080
@@ -145,7 +165,7 @@ jobs:
         working-directory: customer-profile-search-app
         run: mvn test -P ui
 
-  # 6️ Pipeline Success Confirmation
+  # 8️⃣ Pipeline Success Confirmation
   pipeline-success:
     name: Pipeline Completed Successfully
     needs: ui-tests
