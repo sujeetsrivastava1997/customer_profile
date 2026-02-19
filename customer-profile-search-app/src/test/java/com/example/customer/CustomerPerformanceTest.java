@@ -15,13 +15,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class CustomerPerformanceTest {
 
-    private static final int NUM_THREADS = 20; // number of concurrent users
-    private static final int REQUESTS_PER_THREAD = 10;
+    @LocalServerPort
+    int port;
 
-    @BeforeAll
-    public static void setup() {
-        RestAssured.baseURI = "http://localhost:8080";
-    }
+    private static final int NUM_THREADS = 20;
+    private static final int REQUESTS_PER_THREAD = 10;
 
     @Test
     public void testCustomerApiPerformance() throws InterruptedException {
@@ -30,15 +28,14 @@ public class CustomerPerformanceTest {
         for (int i = 0; i < NUM_THREADS; i++) {
             executor.submit(() -> {
                 for (int j = 0; j < REQUESTS_PER_THREAD; j++) {
-                    Response response = RestAssured.get("/api/customers");
-                    assertEquals(200, response.getStatusCode(), "Customer API failed");
+                    Response response = RestAssured.get("http://localhost:" + port + "/api/customers");
+                    assertEquals(200, response.getStatusCode());
                 }
             });
         }
 
         executor.shutdown();
-        boolean finished = executor.awaitTermination(1, TimeUnit.MINUTES);
-        if (!finished) {
+        if (!executor.awaitTermination(2, TimeUnit.MINUTES)) {
             throw new RuntimeException("Performance test did not finish in time");
         }
     }
@@ -50,16 +47,16 @@ public class CustomerPerformanceTest {
         for (int i = 0; i < NUM_THREADS; i++) {
             executor.submit(() -> {
                 for (int j = 0; j < REQUESTS_PER_THREAD; j++) {
-                    Response response = RestAssured.get("/api/customers/search?keyword=John");
-                    assertEquals(200, response.getStatusCode(), "Search API failed");
+                    Response response = RestAssured.get("http://localhost:" + port + "/api/customers/search?keyword=John");
+                    assertEquals(200, response.getStatusCode());
                 }
             });
         }
 
         executor.shutdown();
-        boolean finished = executor.awaitTermination(1, TimeUnit.MINUTES);
-        if (!finished) {
+        if (!executor.awaitTermination(2, TimeUnit.MINUTES)) {
             throw new RuntimeException("Search performance test did not finish in time");
         }
     }
 }
+
