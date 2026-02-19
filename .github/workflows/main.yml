@@ -70,7 +70,8 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Build Docker Image
-        run: docker build -t customer-profile-search-app:latest .
+        run: docker build -t customer-profile-search-app:latest ./customer-profile-search-app
+
 
   # 4️⃣ Deploy to Staging
   deploy-staging:
