@@ -2,19 +2,23 @@ package com.example.customer;
 
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import static org.hamcrest.Matchers.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class CustomerApiRegressionTest {
 
-    @BeforeAll
-    public static void setup() {
+    @LocalServerPort
+    int port; // Injected random port
+
+    @BeforeEach
+    public void setup() {
         RestAssured.baseURI = "http://localhost";
-        RestAssured.port = 8080;
+        RestAssured.port = port; // dynamically use the injected port
     }
 
     @Test
@@ -45,7 +49,18 @@ public class CustomerApiRegressionTest {
 
     @Test
     void shouldUpdateCustomer() {
-        int id = 1; // Assume a customer exists with id=1
+        // First, create a customer to update
+        int id = RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body("{\"firstName\":\"Alice\", \"lastName\":\"Smith\", \"email\":\"alice.smith@example.com\"}")
+                .when()
+                .post("/api/customers")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+
+        // Update the customer
         RestAssured.given()
                 .contentType(ContentType.JSON)
                 .body("{\"firstName\":\"Jane\"}")
@@ -54,7 +69,7 @@ public class CustomerApiRegressionTest {
                 .then()
                 .statusCode(anyOf(equalTo(200), equalTo(204)));
 
-        // Optional: verify update
+        // Verify update
         RestAssured.given()
                 .accept(ContentType.JSON)
                 .when()
