@@ -13,7 +13,7 @@ on:
 jobs:
 
   # ===============================
-  # 1️⃣ Build & Unit Test
+  # 1️⃣ Build & Unit Tests
   # ===============================
   build:
     name: Build & Unit Tests
@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          key: ${{ runner.os }}-maven-${{ hashFiles('customer-profile-search-app/pom.xml') }}
 
       - name: Build Project
         working-directory: customer-profile-search-app
@@ -43,18 +43,16 @@ jobs:
         working-directory: customer-profile-search-app
         run: mvn test
 
-
   # ===============================
   # 2️⃣ API Integration Tests
   # ===============================
   api-tests:
-    name: API Tests (Rest-Assured)
+    name: API Tests
     needs: build
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-
       - uses: actions/setup-java@v3
         with:
           distribution: temurin
@@ -63,7 +61,6 @@ jobs:
       - name: Run API Tests
         working-directory: customer-profile-search-app
         run: mvn verify
-
 
   # ===============================
   # 3️⃣ Docker Build
@@ -78,7 +75,6 @@ jobs:
 
       - name: Build Docker Image
         run: docker build -t customer-profile-search-app:latest ./customer-profile-search-app
-
 
   # ===============================
   # 4️⃣ Deploy to Staging
@@ -100,7 +96,6 @@ jobs:
 
       - name: Verify API Health
         run: curl -f http://localhost:8080/api/customers || exit 1
-
 
   # ===============================
   # 5️⃣ Selenium UI Tests (MANDATORY)
@@ -131,9 +126,8 @@ jobs:
         working-directory: customer-profile-search-app
         run: mvn test -P ui
 
-
   # ===============================
-  # 6️⃣ Success Confirmation
+  # 6️⃣ Pipeline Success Confirmation
   # ===============================
   pipeline-success:
     name: Pipeline Completed Successfully
