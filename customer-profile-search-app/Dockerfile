@@ -1,5 +1,5 @@
-# Stage 1: Build with Java 21
-FROM maven:3.9.2-eclipse-temurin-21 AS builder
+# Stage 1: Build with Maven + Java 21 (Alpine)
+FROM maven:3.9.12-eclipse-temurin-21-alpine AS builder
 WORKDIR /app
 
 # Copy pom and source
@@ -9,8 +9,8 @@ COPY src ./src
 # Build JAR
 RUN mvn clean package -DskipTests
 
-# Stage 2: Run with Java 21
-FROM eclipse-temurin:21-jdk
+# Stage 2: Run with Java 21 (Alpine)
+FROM eclipse-temurin:21-jdk-alpine
 WORKDIR /app
 
 # Copy JAR from builder
