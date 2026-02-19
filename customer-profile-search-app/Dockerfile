@@ -1,4 +1,11 @@
+# Use Temurin JDK
 FROM eclipse-temurin:17-jdk
+
+# Set working directory
 WORKDIR /app
-COPY target/customer-profile-search-app-1.0.0.jar app.jar
+
+# Copy JAR (use wildcard for version flexibility)
+COPY target/*.jar app.jar
+
+# Run app
 ENTRYPOINT ["java","-jar","app.jar"]
