@@ -8,25 +8,36 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class CustomerUiSmokeTest {
 
+    @LocalServerPort
+    int port; // Inject random port
+
     private WebDriver driver;
+    private String baseUrl;
 
     @BeforeEach
     void setup() {
+        // Set base URL dynamically based on random port
+        baseUrl = "http://localhost:" + port;
+
         // Configure ChromeDriver for headless mode
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless"); // Run without GUI
-        options.addArguments("--disable-gpu"); // Recommended for headless
-        options.addArguments("--window-size=1920,1080"); // Ensure full page renders
+        options.addArguments("--headless");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--window-size=1920,1080");
+
         driver = new ChromeDriver(options);
 
-        driver.get("http://localhost:8080"); // URL of your UI page
+        driver.get(baseUrl); // Use dynamic URL
     }
 
     @AfterEach
@@ -54,7 +65,7 @@ public class CustomerUiSmokeTest {
         input.sendKeys("NonExistentCustomer");
         button.click();
 
-        Thread.sleep(1000); // Wait for JS to finish (smoke test)
+        Thread.sleep(1000); // wait for JS to update UI
 
         WebElement resultsDiv = driver.findElement(By.id("results"));
         assertTrue(resultsDiv.getText().contains("No customers found."), "Should display no results message");
@@ -62,7 +73,6 @@ public class CustomerUiSmokeTest {
 
     @Test
     void shouldDisplayCustomerTableHeaders() throws InterruptedException {
-        // Assuming you have a customer "John Doe" in your backend already
         WebElement input = driver.findElement(By.id("keyword"));
         WebElement button = driver.findElement(By.tagName("button"));
 
@@ -70,7 +80,7 @@ public class CustomerUiSmokeTest {
         input.sendKeys("John");
         button.click();
 
-        Thread.sleep(1000); // Wait for JS to populate table
+        Thread.sleep(1000); // wait for table to populate
 
         WebElement resultsDiv = driver.findElement(By.id("results"));
         WebElement table = resultsDiv.findElement(By.tagName("table"));
