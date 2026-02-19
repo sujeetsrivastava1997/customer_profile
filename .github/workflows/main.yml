@@ -1,0 +1,95 @@
+---
+name: Customer Profile CI/CD Pipeline
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+jobs:
+  build:
+    name: Build & Unit Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      - name: Setup Java 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Cache Maven Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+      - name: Build Project
+        run: mvn clean package --batch-mode
+      - name: Run Unit Tests
+        run: mvn test
+  api-tests:
+    name: API Integration Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Run API Tests
+        run: mvn verify
+  docker-build:
+    name: Docker Build
+    needs: api-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Docker Image
+        run: docker build -t customer-profile-search-app:latest .
+  deploy-staging:
+    name: Deploy to Staging
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Docker Container
+        run: >
+          docker stop demo-app || true
+
+          docker rm demo-app || true
+
+          docker run -d -p 8080:8080 --name demo-app customer-profile-search-app:latest
+      - name: Wait for App Startup
+        run: sleep 15
+      - name: Verify API
+        run: curl -f http://localhost:8080/api/customers || exit 1
+  ui-tests:
+    name: Selenium UI Tests
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    services:
+      selenium:
+        image: selenium/standalone-chrome:latest
+        ports:
+          - 4444:4444
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Run Selenium Tests
+        env:
+          BASE_URL: http://localhost:8080
+          SELENIUM_URL: http://localhost:4444/wd/hub
+        run: mvn test -P ui
+  success:
+    name: Pipeline Completed
+    needs: ui-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success Message
+        run: echo "CI/CD Pipeline executed successfully"
