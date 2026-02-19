@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Customer Profile Search</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #aaa;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        input {
+            padding: 5px;
+            width: 250px;
+        }
+        button {
+            padding: 5px 10px;
+        }
+    </style>
+    <script>
+        async function searchCustomer() {
+            const keyword = document.getElementById("keyword").value;
+            const response = await fetch("/api/customers/search?keyword=" + keyword);
+            const data = await response.json();
+
+            const resultDiv = document.getElementById("results");
+            resultDiv.innerHTML = "";
+
+            if(data.length === 0){
+                resultDiv.innerHTML = "<p>No customers found.</p>";
+                return;
+            }
+
+            // Create table
+            const table = document.createElement("table");
+            const header = table.createTHead();
+            const headerRow = header.insertRow(0);
+            const headings = ["First Name", "Last Name", "Email", "Address", "Phone", "Preferred Language", "Employee"];
+            headings.forEach((h, index) => {
+                const cell = headerRow.insertCell(index);
+                cell.outerHTML = "<th>" + h + "</th>";
+            });
+
+            const tbody = table.createTBody();
+            data.forEach(c => {
+                const row = tbody.insertRow();
+                row.insertCell(0).innerText = c.firstName;
+                row.insertCell(1).innerText = c.lastName;
+                row.insertCell(2).innerText = c.email;
+                row.insertCell(3).innerText = c.address;
+                row.insertCell(4).innerText = c.phoneNumber;
+                row.insertCell(5).innerText = c.preferredLanguage;
+                row.insertCell(6).innerText = c.employee ? "Yes" : "No";
+            });
+
+            resultDiv.appendChild(table);
+        }
+    </script>
+</head>
+<body>
+<h2>Customer Profile Search</h2>
+<input type="text" id="keyword" placeholder="Enter name or email" onkeypress="if(event.key==='Enter'){searchCustomer();}"/>
+<button onclick="searchCustomer()">Search</button>
+<div id="results"></div>
+</body>
+</html>

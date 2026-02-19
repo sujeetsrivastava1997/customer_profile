@@ -1,0 +1,184 @@
+name: Customer Profile CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  # -------------------------------
+  # 1️⃣ Build & Unit Test
+  # -------------------------------
+  build-and-test:
+    name: Build & Unit Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Cache Maven Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: \${{ runner.os }}-maven-\${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            \${{ runner.os }}-maven-
+
+      - name: Build with Maven
+        run: mvn clean package --batch-mode
+
+      - name: Run Unit Tests
+        run: mvn test
+
+  # -------------------------------
+  # 2️⃣ API Integration Tests
+  # -------------------------------
+  api-tests:
+    name: API Integration Tests
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Run API Tests (Rest-Assured)
+        run: mvn verify
+
+  # -------------------------------
+  # 3️⃣ Static Code Analysis (SonarQube)
+  # -------------------------------
+  sonar-scan:
+    name: SonarQube Scan
+    needs: api-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Run SonarQube Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          mvn sonar:sonar \
+            -Dsonar.projectKey=customer-profile-search-app \
+            -Dsonar.host.url=https://sonarcloud.io
+
+  # -------------------------------
+  # 4️⃣ Security Scan (OWASP ZAP)
+  # -------------------------------
+  security-scan:
+    name: OWASP ZAP Security Scan
+    needs: sonar-scan
+    runs-on: ubuntu-latest
+    services:
+      zap:
+        image: owasp/zap2docker-stable
+        ports:
+          - 8081:8080
+    steps:
+      - name: Wait for Staging
+        run: sleep 10
+
+      - name: Run Security Scan
+        run: |
+          docker run -v $(pwd):/zap/wrk/:rw -t owasp/zap2docker-stable zap-full-scan.py -t http://localhost:8080
+
+  # -------------------------------
+  # 5️⃣ Docker Build
+  # -------------------------------
+  docker-build:
+    name: Docker Build
+    needs: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Build Docker Image
+        run: |
+          docker build -t customer-profile-search-app:latest .
+
+  # -------------------------------
+  # 6️⃣ Deploy to Staging
+  # -------------------------------
+deploy-staging:
+  name: Deploy to Staging
+  needs: docker-build
+  runs-on: ubuntu-latest
+  steps:
+    - name: Run Docker Container for Staging
+      run: |
+        docker stop demo-staging || true
+        docker rm demo-staging || true
+        docker run -d -p 8080:8080 --name demo-staging customer-profile-search-app:latest
+
+    - name: Test Staging API
+      run: |
+        sleep 10
+        curl -f http://localhost:8080/api/customers || exit 1
+
+
+  # -------------------------------
+  # 7️⃣ UI Automation Tests (Selenium)
+  # -------------------------------
+  ui-tests:
+    name: Selenium UI Tests
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    services:
+      selenium:
+        image: selenium/standalone-chrome:latest
+        ports:
+          - 4444:4444
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Run UI Selenium Tests
+        env:
+          BASE_URL: http://localhost:8080
+          SELENIUM_URL: http://localhost:4444/wd/hub
+        run: mvn test -P ui
+
+  # -------------------------------
+  # 8️⃣ Performance Test (JMeter)
+  # -------------------------------
+  performance-test:
+    name: Performance Test
+    needs: ui-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Run JMeter Performance Tests
+        run: |
+          jmeter -n -t performance-tests/customer-search.jmx -l results.jtl
