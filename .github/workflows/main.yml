@@ -33,15 +33,15 @@ jobs:
 
       - name: Build Project
         working-directory: customer-profile-search-app
-        run: mvn clean package --batch-mode -DskipTests
-
-      - name: Run Unit Tests
-        working-directory: customer-profile-search-app
-        run: mvn test
+        run: mvn clean package --batch-mode
 
       - name: List target folder (debug)
         working-directory: customer-profile-search-app
         run: ls -la target
+
+      - name: Run Unit Tests
+        working-directory: customer-profile-search-app
+        run: mvn test
 
   # 2️⃣ API Tests
   api-tests:
@@ -60,7 +60,7 @@ jobs:
         working-directory: customer-profile-search-app
         run: mvn verify
 
-  # 3️⃣ Docker Build (Multi-stage)
+  # 3️⃣ Docker Build
   docker-build:
     name: Docker Build
     needs: api-tests
@@ -69,17 +69,34 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Build Docker Image (Multi-stage)
-        working-directory: customer-profile-search-app
-        run: docker build -t customer-profile-search-app:latest .
+      - name: Build Docker Image
+        run: docker build -t customer-profile-search-app:latest ./customer-profile-search-app
 
-  # 4️⃣ Deploy Locally for Staging & Smoke Tests
+      - name: Save Docker Image as Artifact
+        run: docker save customer-profile-search-app:latest -o customer-profile-search-app.tar
+
+      - name: Upload Docker Image Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: customer-profile-search-app.tar
+
+  # 4️⃣ Deploy to Staging
   deploy-staging:
     name: Deploy to Staging
     needs: docker-build
     runs-on: ubuntu-latest
 
     steps:
+      - name: Download Docker Image Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: .
+
+      - name: Load Docker Image
+        run: docker load -i customer-profile-search-app.tar
+
       - name: Run Docker Container
         run: |
           docker stop demo-app || true
@@ -92,7 +109,7 @@ jobs:
       - name: Verify API Health
         run: curl -f http://localhost:8080/api/customers || exit 1
 
-  # 5️⃣ Selenium UI Tests
+  # 5️⃣ Selenium UI Tests (Mandatory)
   ui-tests:
     name: Selenium UI Automation
     needs: deploy-staging
