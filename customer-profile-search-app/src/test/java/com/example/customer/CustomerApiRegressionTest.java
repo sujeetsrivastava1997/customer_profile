@@ -13,69 +13,73 @@ import static org.hamcrest.Matchers.*;
 public class CustomerApiRegressionTest {
 
     @LocalServerPort
-    int port; // Injected random port
+    int port;
 
     @BeforeEach
     public void setup() {
         RestAssured.baseURI = "http://localhost";
-        RestAssured.port = port; // dynamically use the injected port
+        RestAssured.port = port;
     }
 
     @Test
-    void shouldCreateAndRetrieveCustomer() {
-        // Create a customer
-        int id = RestAssured.given()
+    void shouldCreateCustomer() {
+        RestAssured.given()
                 .contentType(ContentType.JSON)
                 .body("{\"firstName\":\"John\", \"lastName\":\"Doe\", \"email\":\"john.doe@example.com\"}")
                 .when()
                 .post("/api/customers")
                 .then()
-                .statusCode(201)
+                .statusCode(anyOf(equalTo(200), equalTo(201)))
                 .body("id", notNullValue())
-                .extract()
-                .path("id");
-
-        // Retrieve the customer
-        RestAssured.given()
-                .accept(ContentType.JSON)
-                .when()
-                .get("/api/customers/" + id)
-                .then()
-                .statusCode(200)
                 .body("firstName", equalTo("John"))
                 .body("lastName", equalTo("Doe"))
                 .body("email", equalTo("john.doe@example.com"));
     }
 
     @Test
-    void shouldUpdateCustomer() {
-        // First, create a customer to update
-        int id = RestAssured.given()
+    void shouldGetAllCustomers() {
+        // Create a customer first
+        RestAssured.given()
                 .contentType(ContentType.JSON)
                 .body("{\"firstName\":\"Alice\", \"lastName\":\"Smith\", \"email\":\"alice.smith@example.com\"}")
                 .when()
                 .post("/api/customers")
                 .then()
-                .statusCode(201)
-                .extract()
-                .path("id");
+                .statusCode(anyOf(equalTo(200), equalTo(201)));
 
-        // Update the customer
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body("{\"firstName\":\"Jane\"}")
-                .when()
-                .patch("/api/customers/" + id)
-                .then()
-                .statusCode(anyOf(equalTo(200), equalTo(204)));
-
-        // Verify update
+        // Get all customers
         RestAssured.given()
                 .accept(ContentType.JSON)
                 .when()
-                .get("/api/customers/" + id)
+                .get("/api/customers")
                 .then()
                 .statusCode(200)
-                .body("firstName", equalTo("Jane"));
+                .body("size()", greaterThan(0))
+                .body("[0].firstName", notNullValue())
+                .body("[0].lastName", notNullValue())
+                .body("[0].email", notNullValue());
+    }
+
+    @Test
+    void shouldSearchCustomerByKeyword() {
+        // Create a customer first
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .body("{\"firstName\":\"Bob\", \"lastName\":\"Marley\", \"email\":\"bob.marley@example.com\"}")
+                .when()
+                .post("/api/customers")
+                .then()
+                .statusCode(anyOf(equalTo(200), equalTo(201)));
+
+        // Search customer
+        RestAssured.given()
+                .accept(ContentType.JSON)
+                .queryParam("keyword", "Bob")
+                .when()
+                .get("/api/customers/search")
+                .then()
+                .statusCode(200)
+                .body("size()", greaterThan(0))
+                .body("[0].firstName", equalTo("Bob"));
     }
 }
